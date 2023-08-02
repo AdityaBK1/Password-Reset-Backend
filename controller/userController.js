@@ -1,9 +1,11 @@
 require('dotenv').config()
 const UserModel = require("../models/user");
 const nodemailer = require('nodemailer')
+const jwt = require('jsonwebtoken');
 
 const Email_Id = process.env.Email_Id
 const Email_Pass = process.env.Email_Pass
+const Secret_Key = process.env.Secret_Key
 
 module.exports.getUser = async (req, res) => {
     const user = await UserModel.find();
@@ -49,7 +51,7 @@ module.exports.resetPassword = async (req, res) => {
         Math.random().toString(36).substring(2, 15) +
         Math.random().toString(36).substring(2, 15);
 
-    const link = `http://localhost:3000/passwordreset/${randomString}`;
+    const link = `https://lovely-figolla-4dd39a.netlify.app/passwordreset/${randomString}`;
 
     user.resettoken = randomString;
     const updated = await UserModel.findByIdAndUpdate(user._id, user);
@@ -68,7 +70,7 @@ module.exports.resetPassword = async (req, res) => {
 
     const sendMail = async () => {
         const info = await transporter.sendMail({
-            from: `"Aditya" <${Email_Id}>`,
+            from: `"Boobathi Thillan" <${Email_Id}>`,
             to: user.email,
             subject: "Reset Password",
             text: link
@@ -85,15 +87,14 @@ module.exports.passwordUpdate = async (req, res) => {
     const user = await UserModel.findOne({ resettoken });
 
     if (!user) {
-       return res.status(404).json({ Message: "User not found" });
+        return res.status(404).json({ Message: "User not found" });
     }
     user.password = password
-    const update = await UserModel.findByIdAndUpdate(user._id, user)
-    if (update) {
-        user.resettoken = null;
-        UserModel.findByIdAndUpdate(user._id, user)
-       return res.send({ Message: "Password Updated successfully" })
-    }
+    user.resettoken = "";
+    await UserModel.findByIdAndUpdate(user._id, user)
+
+    return res.send({ Message: "Password Updated successfully" })
+
 }
 
 
@@ -109,12 +110,15 @@ module.exports.Signin = async (req, res) => {
     }
 
     // compare passwords
-    if (!user.password == password) {
+    if (user.password !== password) {
         return res.status(400).json({ message: 'Authentication failed' });
     }
 
     // generate and send the JWT token
-    const token = jwt.sign({ userId: user._id }, Secret_Key, { expiresIn: '2h' });
-    return res.status(201).json(token)
+    if (user && password) {
+        const token = jwt.sign({ userId: user._id }, Secret_Key, { expiresIn: '2h' });
+        return res.status(201).json(token)
+    }
+
 
 }
